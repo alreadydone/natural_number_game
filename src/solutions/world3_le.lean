@@ -4,76 +4,75 @@ import tactic.interactive
 
 -- #check tactic.interactive.rintro 
 meta def less_leaky.interactive.rintro := tactic.interactive.rintro
+
 namespace mynat
 
+-- example
 theorem le_refl (a : mynat) : a ≤ a :=
 begin
   use 0,
-  rw add_zero,  
+  rw add_zero,
 end
+
+example : one ≤ one := le_refl one
 
 -- ignore this; it's making the "refl" tactic work with goals of the form a ≤ a
 attribute [_refl_lemma] le_refl
 
 theorem le_succ {a b : mynat} (h : a ≤ b) : a ≤ (succ b) :=
 begin
-  cases h with c hc,
-  use (succ c),
-  rw add_succ,
-  rw hc,
+  cases h with c h,
+  use succ c,
+  rw add_succ, rw h,
 end
 
-example : one ≤ one := le_refl one
 
 lemma zero_le (a : mynat) : 0 ≤ a :=
 begin
-  use a,
-  rw' zero_add a,
-  refl
+  use a, rw zero_add,
 end
 
 lemma le_zero {a : mynat} : a ≤ 0 → a = 0 :=
 begin
   intro h,
-  cases h with c hc,
-  rw add_comm at hc,
-  cases a with b,
-    refl,
-  exfalso,
-  rw add_succ at hc,
-  rw eq_comm at hc,
-  exact succ_ne_zero hc,
+  cases h with b h,
+  apply add_right_eq_zero,
+  exact eq.symm h,
+/-
+  intro h,
+  cases h with b h,
+  cases a with a,
+   refl,
+   rw succ_add at h,
+   apply absurd (eq.symm h),
+   apply succ_ne_zero,
+  -/
 end
 
 theorem le_trans ⦃a b c : mynat⦄ (hab : a ≤ b) (hbc : b ≤ c) : a ≤ c :=
 begin
-  -- again no induction
-  cases hab with x hx,
-  cases hbc with y hy,
-  use (x + y),
-  rw ←add_assoc,
-  rw ←hx,
-  assumption,
+  cases hab with d hab,
+  cases hbc with e hbc,
+  use d+e,
+  rw hab at hbc,
+  rw hbc,
+  apply add_assoc,
 end
 
 instance : preorder mynat := by structure_helper
 
+-- ignore this, it's the definition.
 theorem lt_iff_le_not_le {a b : mynat} : a < b ↔ a ≤ b ∧ ¬ b ≤ a := iff.rfl
 
 theorem le_antisymm : ∀ {{a b : mynat}}, a ≤ b → b ≤ a → a = b :=
 begin
   intros a b hab hba,
-  cases hab with c hc,
-  cases hba with d hd,
-  rw hc at hd,
-  rw add_assoc at hd,
-  rw eq_comm at hd,
-  have H := eq_zero_of_add_right_eq_self hd,
-  rw eq_comm at hc,
-  convert hc,
-  symmetry,
-  convert add_zero a,
-  exact add_right_eq_zero H,
+  cases hab with c hab,
+  cases hba with d hba,
+  rw hba at hab,
+  rw add_assoc at hab,
+  rw add_right_eq_zero (eq_zero_of_add_right_eq_self (eq.symm hab)) at hba,
+  rw add_zero at hba, exact hba,
 end
 
 instance : partial_order mynat := by structure_helper
@@ -81,45 +80,38 @@ instance : partial_order mynat := by structure_helper
 theorem lt_iff_le_and_ne ⦃a b : mynat⦄ : a < b ↔ a ≤ b ∧ a ≠ b :=
 begin
   split,
-  { intro h,
-    rw lt_iff_le_not_le at h,
-    cases h with hab hba,
-    split, exact hab,
+   intro h,
+   cases h with h1 h2,
+   split,
+    exact h1,
     intro h,
-    apply hba,
-    rw' h,
-    apply le_refl,
-  },
-  { intro h,
-    cases h with hab hne,
-    rw lt_iff_le_not_le,
-    split, assumption,
-    intro hba,
-    apply hne,
-    apply le_antisymm hab hba,
-  }
+    rw h at h2,
+    exact h2 (le_refl b),
+   intro h,
+   split,
+    cases h with h _, exact h,
+    cases h with h1 h2,
+    intro h,
+    exact h2 (le_antisymm h1 h),
 end
 
 
 lemma succ_le_succ {a b : mynat} (h : a ≤ b) : succ a ≤ succ b :=
 begin
-  cases h with c hc,
-  use c,
-  rw succ_add,
-  rw hc,
+  cases h with c h,
+  use c, rw succ_add, rw h,
 end
 
 theorem le_total (a b : mynat) : a ≤ b ∨ b ≤ a :=
 begin
   revert a,
-  induction' b with c hc,
+  induction b with b h,
     intro a, right, apply zero_le,
-  intro a,
-  induction' a with d hd,
-    left, apply zero_le,
-  cases hc d with h h,
-    left, exact succ_le_succ h,
-    right, exact succ_le_succ h,
+    intro a, cases a with a,
+      left, apply zero_le,
+      cases h a with h1 h2,
+        left, exact succ_le_succ h1,
+        right, exact succ_le_succ h2,
 end
 
 instance : linear_order mynat := by structure_helper
@@ -128,304 +120,236 @@ instance : linear_order mynat := by structure_helper
 theorem add_le_add_right (a b : mynat) : a ≤ b → ∀ t, (a + t) ≤ (b + t) :=
 begin
   intros h t,
-  induction' t with d hd,
-  { 
-    rw add_zero, rw add_zero,
-    assumption
-  },
-  {
-    rw add_succ,
-    rw add_succ,
-    exact succ_le_succ hd
-  }
+  cases h with c h,
+  use c,
+  rw h,
+  rw add_right_comm,
 end
 
 theorem le_succ_self (a : mynat) : a ≤ succ a :=
 begin
-  apply le_succ,
-  apply le_refl
+  use 1, rw succ_eq_add_one,
 end
 
 theorem le_of_succ_le_succ {a b : mynat} : succ a ≤ succ b → a ≤ b :=
 begin
   intro h,
-  cases h with c hc,
+  cases h with c h,
   use c,
-  rw succ_add at hc,
-  exact succ_inj hc,
+  rw succ_add at h,
+  exact succ_inj h,
+/-
+  repeat {rw succ_eq_add_one at h},
+  rw add_right_comm at h,
+  exact (add_right_cancel h),
+-/
 end
 
 theorem not_succ_le_self {{d : mynat}} (h : succ d ≤ d) : false :=
 begin
-  cases h with c hc,
-  rw ←add_one_eq_succ at hc,
-  rw add_assoc at hc,
-  rw eq_comm at hc,
-  have h := eq_zero_of_add_right_eq_self hc,
-  rw add_comm at h,
-  rw add_one_eq_succ at h,
-  apply zero_ne_succ c,
+  cases h with c h,
+  rw succ_add at h,
+  rw ← add_succ at h,
+  apply zero_ne_succ,
   symmetry,
-  assumption,
+  exact eq_zero_of_add_right_eq_self (eq.symm h),
 end
 
-theorem add_le_add_left :
-  ∀ (a b : mynat), a ≤ b → ∀ (c : mynat), c + a ≤ c + b :=
+theorem add_le_add_left : ∀ (a b : mynat), a ≤ b → ∀ (c : mynat), c + a ≤ c + b :=
 begin
-  intros a b hab c,
-  rw add_comm,
-  rw add_comm c,
+  intros a b h c,
+  rw add_comm c a,
+  rw add_comm c b,
   apply add_le_add_right,
-  assumption
+  exact h,
 end
 
 def succ_le_succ_iff (a b : mynat) : succ a ≤ succ b ↔ a ≤ b :=
 begin
   split,
-  { intro h,
-    cases h with c hc,
-    use c,
-    apply succ_inj,
-    convert hc,
-    rw' succ_add,
-    refl
-  },
-  { intro h,
-    cases h with c hc,
-    use c,
-    rw succ_add,
-    rw' hc,
-    refl,
-  }
+    exact le_of_succ_le_succ,
+    exact succ_le_succ,
 end
 
-
+-- convenient lemma
+def lt_iff_succ_le (a b : mynat) : a < b ↔ succ a ≤ b :=
+begin
+  split,
+    intro h,
+    cases h with h1 h2,
+    cases h1 with c h1,
+    cases c with c,
+      rw mynat_zero_eq_zero at h1,
+      rw add_zero at h1,
+      rw h1 at h2,
+      apply absurd (le_refl a) h2,
+      use c,
+      rw succ_add, rw ← add_succ, exact h1,
+    intro h,
+    split,
+      cases h with c h,
+      use (succ c),
+      rw add_succ, rw ← succ_add, exact h,
+      intro h1,
+      exact not_succ_le_self (le_trans h h1),
+end
 
 def succ_lt_succ_iff (a b : mynat) : succ a < succ b ↔ a < b :=
 begin
-  rw lt_iff_le_not_le,
-  rw lt_iff_le_not_le,
+  repeat {rw lt_iff_succ_le},
+  exact succ_le_succ_iff (succ a) b,
+/-
   split,
     intro h,
-    cases h,
+    cases h with h1 h2,
     split,
-      rwa succ_le_succ_iff at h_left,
-    intro h, apply h_right,
-    rwa succ_le_succ_iff,
+      apply le_of_succ_le_succ h1,
+      intro h, exact h2 (succ_le_succ h),
+    intro h,
+    cases h with h1 h2,
+    split,
+      apply succ_le_succ h1,
+      intro h, exact h2 (le_of_succ_le_succ h),
+-/
+end
+
+
+theorem le_of_add_le_add_left ⦃ a b c : mynat⦄ : a + b ≤ a + c → b ≤ c :=
+begin
   intro h,
-  cases h,
-  split,
-    rwa succ_le_succ_iff,
-  intro h, apply h_right,
-  rwa succ_le_succ_iff at h,  
+  cases h with d h,
+  use d,
+  rw add_assoc at h,
+  exact add_left_cancel h,
 end
 
 theorem lt_of_add_lt_add_left : ∀ {{a b c : mynat}}, a + b < a + c → b < c :=
 begin
   intros a b c,
+  repeat {rw lt_iff_succ_le},
+  rw ← add_succ,
   intro h,
-  rw add_comm at h,
-  rw add_comm a at h,
-  revert b c,
-  induction a with d hd,
-    intros a b h, exact h,
-  intros b c h,
-  rw [add_succ, add_succ] at h,
-  apply hd,
-  rwa succ_lt_succ_iff at h,
+  exact le_of_add_le_add_left h,
 end
 
 theorem le_iff_exists_add : ∀ (a b : mynat), a ≤ b ↔ ∃ (c : mynat), b = a + c :=
 begin
-  intros a b,
-  refl,
+  exact le_def,
 end
 
 theorem zero_ne_one : (0 : mynat) ≠ 1 :=
 begin
-  symmetry,
-  rw one_eq_succ_zero,
-  apply succ_ne_zero,
+  exact zero_ne_succ 0,
 end
 
 instance : ordered_comm_monoid mynat := by structure_helper
 
-theorem le_of_add_le_add_left ⦃ a b c : mynat⦄ : a + b ≤ a + c → b ≤ c :=
-begin
-  intro h,
-  cases h with d hd,
-  use d,
-  rw add_assoc at hd,
-  exact add_left_cancel hd
-end
-
 instance : ordered_cancel_comm_monoid mynat := by structure_helper
 
-theorem mul_le_mul_of_nonneg_left ⦃a b c : mynat⦄ : a ≤ b → 0 ≤ c → c * a ≤ c * b :=
+-- removed redundant condition 0 ≤ c
+theorem mul_le_mul_of_nonneg_left ⦃a b c : mynat⦄ : a ≤ b → c * a ≤ c * b :=
 begin
-  intro hab,
-  intro hc,
-  cases hab with d hd,
-  rw hd,
-  use c * d,
-  rw' mul_add,
-  refl
+  intros h,
+  cases h with d h,
+  rw h, rw mul_add,
+  use c*d,
 end
 
-theorem mul_le_mul_of_nonneg_right ⦃a b c : mynat⦄ : a ≤ b → 0 ≤ c → a * c ≤ b * c :=
+theorem mul_le_mul_of_nonneg_right ⦃a b c : mynat⦄ : a ≤ b → a * c ≤ b * c :=
 begin
-  rw mul_comm,
-  rw mul_comm b,
-  apply mul_le_mul_of_nonneg_left
+  rw mul_comm a c, rw mul_comm b c,
+  apply mul_le_mul_of_nonneg_left,
 end
 
 theorem ne_zero_of_pos ⦃a : mynat⦄ : 0 < a → a ≠ 0 :=
 begin
-  intro ha,
-  intro h,
-  rw h at ha,
-  rw lt_iff_le_and_ne at ha,
-  cases ha with h1 h2,
-  apply h2,
-  refl,
+  rw lt_iff_le_and_ne,
+  intros h,
+  cases h with _ h,
+  symmetry, exact h,
 end
 
 theorem mul_lt_mul_of_pos_left ⦃a b c : mynat⦄ : a < b → 0 < c → c * a < c * b :=
 begin
-  intros hab hc,
-  cases' hab with hab hba,
-  rw lt_iff_le_and_ne,
-  split,
-  { cases hab with d hd,
-    use c * d,
-    rw hd,
-    rw' mul_add,
-    refl,
-  },
-  { intro h,
-    apply hba,
-    have h2 := mul_left_cancel (ne_zero_of_pos hc) h,
-    rw' h2,
-    refl
-  }
-
+  intros h hc,
+  rw lt_iff_succ_le at h hc ⊢, rw succ_eq_add_one,
+  apply le_trans (add_le_add_left 1 c hc (c*a)),
+  rw ← mul_succ,
+  exact mul_le_mul_of_nonneg_left h,
 end
 
 theorem mul_lt_mul_of_pos_right ⦃a b c : mynat⦄ : a < b → 0 < c → a * c < b * c :=
 begin
-  rw mul_comm,
-  rw mul_comm b,
+  rw mul_comm a c, rw mul_comm b c,
   apply mul_lt_mul_of_pos_left,
 end
 
 instance : ordered_semiring mynat := by structure_helper
 
-theorem not_lt_zero ⦃a : mynat⦄ : ¬(a < 0) :=
-begin [less_leaky]
---  rintro ⟨ha, hna⟩, -- *TODO* -- rintro doesn't work??
+lemma lt_irrefl (a : mynat) : ¬ (a < a) :=
+begin
   intro h,
-  cases h with ha hna,
-  apply hna, clear hna,
-  --apply le_zero at ha,
-  replace ha := le_zero ha,
-  rw ha,
-  refl,
+  cases h with h1 h2,
+  exact h2 h1,
 end
 
-#check @nat.lt_succ_iff
-#check @nat.succ_eq_add_one
-/-
-nat.lt_succ_iff : ∀ {m n : ℕ}, m < nat.succ n ↔ m ≤ n
--/
+theorem not_lt_zero ⦃a : mynat⦄ : ¬(a < 0) :=
+begin
+  intro h,
+  rw lt_iff_succ_le at h,
+  exact not_succ_le_self (le_trans h (zero_le a)),
+end
 
 theorem lt_succ_self (n : mynat) : n < succ n :=
-begin [less_leaky]
-  rw lt_iff_le_and_ne,
-  split,
-    use 1,
-    apply succ_eq_add_one,
-  intro h,
-  exact ne_succ_self n h
+begin
+  rw lt_iff_succ_le,
 end
 
 theorem lt_succ_iff (m n : mynat) : m < succ n ↔ m ≤ n :=
-begin [less_leaky]
-  rw lt_iff_le_and_ne,
-  split,
-  { rintro ⟨h1, h2⟩,
-    cases h1 with c hc,
-    cases c with d,
-      exfalso,
-      apply h2,
-      rw hc,
-      rw add_zero,refl,
-    use d,
-    apply succ_inj,
-    rw hc,
-    apply add_succ,
-  },
-  { rintro ⟨c, hc⟩,
-    split,
-    { use succ c,
-      rw hc,
-      rw add_succ,
-      refl
-    },
-    { rw hc,
-      apply ne_of_lt,
-      rw lt_iff_le_and_ne,
-      split,
-        use succ c,
-        rw add_succ,
-        refl,
-      intro h,
-      rw [succ_eq_add_one, add_assoc] at h,
-      -- doesn't' work yet
-      -- symmetry at h,
-      rw eq_comm at h,
-      replace h := eq_zero_of_add_right_eq_self h,
-      apply zero_ne_succ c,
-      rw ←h,
-      apply add_one_eq_succ
-    }
-  }
+begin
+  rw lt_iff_succ_le,
+  exact succ_le_succ_iff m n,
 end
 
--- is this right?
-@[elab_as_eliminator]
+-- lemma necessary for the second approach to strong_induction below
+theorem le_if_eq_or_lt (m n : mynat) : m ≤ n ↔ m < n ∨ m = n :=
+begin
+  split,
+    intro h,
+    cases h with c h,
+    cases c with c,
+      right, rw [mynat_zero_eq_zero, add_zero] at h, symmetry, exact h,
+      left, rw [add_succ, ← succ_add] at h, rw lt_iff_succ_le, use c, exact h,
+    intro h, cases h,
+      rw lt_iff_le_not_le at h, cases h with h _, exact h,
+      rw h,
+end
+
 theorem strong_induction (P : mynat → Prop)
   (IH : ∀ m : mynat, (∀ d : mynat, d < m → P d) → P m) :
   ∀ n, P n :=
 begin [less_leaky]
-  let Q : mynat → Prop := λ m, ∀ d < m, P d,
-  have hQ : ∀ n, Q n,
-  { intro n,
-    induction n with d hd,
-    { intros m hm,
-      exfalso,
-      exact not_lt_zero hm,
-    },
-    { intro m,
-      intro hm,
-      rw lt_succ_iff at hm,
-      apply IH,
-      intros e he,
-      apply hd,
-      exact lt_of_lt_of_le he hm,
-    }
-  },
   intro n,
-  apply hQ (succ n),
-  apply lt_succ_self
-end
-
-lemma lt_irrefl (a : mynat) : ¬ (a < a) :=
-begin
-  intro h,
-  rw lt_iff_le_and_ne at h,
-  cases h with h1 h2,
-  apply h2,
-  refl,
+  apply IH,
+  induction n with n h,
+    intros d ltz, exfalso, exact not_lt_zero ltz,
+    {
+      intros d h1,
+      rw lt_succ_iff at h1,
+      apply IH,
+      intros e h2,
+      apply h,
+      rw lt_iff_succ_le at h2 ⊢,
+      exact le_trans h2 h1,
+      -- without appeal to lt_of_lt_of_le (external reference)
+/-
+    rw [lt_succ_iff, le_if_eq_or_lt] at h1,
+    cases h1,
+      exact h d h1,
+      rw h1,
+      exact IH n h,
+-/
+    }
 end
 
 end mynat
